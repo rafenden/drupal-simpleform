@@ -1,0 +1,151 @@
+<?php
+
+use Symfony\Component\Yaml\Yaml;
+use Symfony\Component\Yaml\Exception\ParseException;
+
+/**
+ * Implements hook_menu().
+ */
+function simpleform_editor_menu() {
+  $items['simpleform-editor'] = array(
+    'title' => 'Simpleform editor',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('simpleform_editor_form'),
+    'access arguments' => array('access simpleform editor'),
+  );
+
+  $items['simpleform-editor/preview'] = array(
+    'title' => 'Simpleform preview',
+    'page callback' => 'simpleform_editor_preview',
+    'access arguments' => array('access simpleform editor'),
+  );
+
+  return $items;
+}
+
+/**
+ * Implements hook_permission().
+ */
+function simpleform_editor_permission() {
+  return array(
+    'access simpleform editor' =>  array(
+      'title' => t('Access Simpleform editor'),
+      'description' => t('Allow user to use Simpleform editor.'),
+    ),
+  );
+}
+
+/**
+ * Implements hook_admin_paths_alter().
+ */
+function simpleform_editor_admin_paths_alter(&$paths) {
+  $paths['simpleform-editor'] = TRUE;
+}
+
+/**
+ * Simpleform editor form.
+ */
+function simpleform_editor_form($form, &$form_state) {
+  $source = !empty($_SESSION['simpleform_preview'])
+    ? $_SESSION['simpleform_preview']
+    : Yaml::dump(simpleform_editor_default_structure(), 4, 2);
+
+  $form['source'] = array(
+    '#type' => 'textarea',
+    '#resizable' => FALSE,
+    '#title' => t('Simpleform source'),
+    '#required' => TRUE,
+    '#default_value' => $source,
+    '#rows' => 20,
+  );
+
+  _form_set_class($form['source'], array('ace-enabled'));
+
+  $form['preview'] = array(
+    '#type' => 'submit',
+    '#value' => t('Preview form'),
+  );
+
+  $module_path = drupal_get_path('module', 'simpleform_editor');
+  $form['#attached']['js'][] = "$module_path/simpleform_editor.js";
+  $form['#attached']['js'][] = array('type' => 'external', 'data' => '//ajaxorg.github.io/ace-builds/src-min-noconflict/ace.js');
+
+  return $form;
+}
+
+/**
+ * Menu callback for Simpleform preview page.
+ */
+function simpleform_editor_preview() {
+  // If the form definition exists then render it.
+  if (!empty($_SESSION['simpleform_preview'])) {
+    $simpleform = Simpleform::formSource($_SESSION['simpleform_preview']);
+    drupal_set_title($simpleform->getLabel());
+    $form = drupal_get_form('simpleform_form', $simpleform);
+    return $form;
+  }
+  // Otherwise redirect to the editor.
+  else {
+    drupal_goto('simpleform-editor');
+  }
+}
+
+/**
+ * Default structure of Simpleform when using the editor.
+ *
+ * @return array
+ */
+function simpleform_editor_default_structure() {
+  return array(
+    'label' => 'My new form',
+    'settings' => array(
+      'eta' => '5 minutes',
+    ),
+    'elements' => array(
+      'firstStep' => array(
+        '.type' => 'step',
+        '.title' => 'First step',
+        'yourName' => array(
+          '.type' => 'textfield',
+          '.title' => 'Your name',
+        ),
+      ),
+      'secondStep' => array(
+        '.type' => 'step',
+        '.title' => 'Second step',
+        'herName' => array(
+          '.type' => 'textfield',
+          '.title' => 'Her name',
+        ),
+      ),
+    ),
+  );
+}
+
+/**
+ * Simpleform editor form.
+ */
+function simpleform_editor_form_validate($form, &$form_state) {
+  $source = $form_state['values']['source'];
+
+  try {
+    $parsed = Simpleform::parseFormDefinition($source);
+    $form_state['values']['parsed_source'] = $parsed;
+    if (!is_array($parsed)) {
+      throw new ParseException('Incorrect format of the Simpleform source.');
+    }
+  }
+  catch (ParseException $e) {
+    form_set_error('source', $e->getMessage());
+  }
+}
+
+/**
+ * Simpleform editor form.
+ */
+function simpleform_editor_form_submit($form, &$form_state) {
+  if (!empty($form_state['values']['parsed_source'])) {
+    $_SESSION['simpleform_preview'] = $form_state['values']['source'];
+    $form_state['redirect'] = 'simpleform-editor/preview';
+  }
+}

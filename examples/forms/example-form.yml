@@ -1,0 +1,192 @@
+label: Example form
+description: This is just an example
+
+settings:
+  eta: 10 minutes
+  requirements:
+    - proof of your identity, for example, a passport or driver’s licence
+    - proof of address, for example, a recent gas, water, phone or electricity bill
+    - proof of your disability, such as a GP's letter
+    - your national insurance number
+    - a passport photo
+  confirmation_message: Thank you for submitting the form.
+
+elements:
+
+  # Step 1
+  getStarted:
+    .title: Get started
+    .type: step
+
+    days:
+      .type: select
+      .title: 'Days of the week'
+      .options: '[simpleform:days]'
+
+    whichOfTheFollowing:
+      .title: Which of the following would you like to do
+      .type: radios
+      .required: false
+      .options:
+        1: Apply for a new badge
+        2: Renew a badge
+        3: Replace a lost badge
+        4: Replace a stolen badge
+
+    permitFor:
+      .title: Who is the permit for?
+      .type: radios
+      .required: false
+      .options:
+        1: Me
+        2: Someone else
+        3: An organisation
+
+    badgeNumber:
+      .title: Badge number
+      .type: textfield
+      .states:
+        visible:
+          input[name=whichOfTheFollowing]:
+            - !value: 1
+
+    expiryDate:
+      .title: Expiry date
+      .date_format: d M Y
+      .type: date_popup
+      .datepicker_options: [maxDate: 30]
+      .date_year_range: '0:+4'
+      .required: false
+      .date_label_position: none
+      .states:
+        visible:
+          input[name=whichOfTheFollowing]:
+            - !value: 1
+
+    address:
+      .title: Address
+      .type: addressfield
+      .available_countries: [GB]
+      .handlers: [address]
+
+  # Step 2
+  typeOfDisability:
+    .title: Type of disability
+    .type: step
+
+    typeOfDisabilitySelection:
+      .title: Select what applies to you
+      .type: radios
+      .required: false
+      .options:
+        1: Difficulties seeing
+        2: Difficulties with mobility
+        3: Child under 3 years old requiring special medical equipment
+        4: None of the above
+
+  # Step 3
+  proofOfDisability:
+    .title: Proof of disability
+    .type: step
+
+    proof:
+      .title: What proof are you giving us?
+      .type: radios
+      .required: false
+      .options:
+        1: A certificate of vision impairment (CVI) or a BD8 form, signed by a consultant ophthalmologist (eye doctor), stating that you are severely sight impaired (blind) and wish to be registered as severely sight impaired with us (your local council)
+        2: The name of the local authority or borough in which you are registered as blind (severely sight impaired)
+        3: None of the above
+
+  # Step 4
+  applicationDetails:
+    .title: Application details
+    .type: step
+
+    personalDetails:
+      .type: partial
+      .partial: personal-details
+      .overrides:
+        .title: Personal details
+        firstName:
+          .title: First name of person applying for a blue badge
+
+    # Subgroup
+    personalDetails:
+      .title: Personal details
+      .type: fieldset
+      title:
+        .title: Title
+        .type: select
+        .options:
+          mr: Mr
+          mrs: Mrs
+          miss: Miss
+          ms: Ms
+          master: Master
+          dr: Dr
+          rev: Rev
+          other: Other
+      firstName:
+        .title: First name
+        .type: textfield
+      lastName:
+        .title: Last name
+        .type: textfield
+      dob:
+        .title: Date of birth
+        .date_format: d M Y
+        .type: date_popup
+        .datepicker_options: [maxDate: 30]
+        .date_year_range: '-100:0'
+        .date_label_position: none
+      nin:
+        .title: National insurance number
+        .type: textfield
+      fullNameOnBirth:
+        .title: Full name on birth
+        .type: textfield
+      townAndCountryOfBirth:
+        .title: Town and country of birth
+        .type: textfield
+      gender:
+        .title: Gender
+        .type: radios
+        .options:
+          male: Male
+          female: Female
+
+    # Subgroup
+    submitEvidence:
+      .title: Submit evidence
+      .type: fieldset
+      checkTaxPermission:
+        .title: Do you give us permission to check council tax details?
+        .type: radios
+        .options:
+          yes: 'Yes'
+          no: 'No'
+      proofOfIdentiy:
+        .title: Proof of identiy
+        .type: radios
+        .options:
+          1: Civil partnership/dissolution certificate
+          2: Driving licence photocard
+          3: Marriage/divorce certificate
+          4: Passport photopage
+          5: Birth/adoption certificate
+      evidenceFile:
+        .title: Upload a Certificate of Vision Impairment, signed by a consultant opthalmologist
+        .type: file
+        .description: Please note you are able to take a picture of the document on your mobile and upload here. When you photograph the document, please ensure the image is as clear as possible, or it may delay processing your application.
+      troubleUploadingDocs:
+        .title: Having trouble uploading your document(s)?
+        .description: You can also give them to us in person or post them.
+        .type: item
+        hasTroubleUploadingDocs:
+          .title: I can't upload my document(s)
+          .type: checkbox
+
+
+
+

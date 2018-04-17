@@ -1,0 +1,5 @@
+name = Simpleform
+description = Functionality related to forms rendered from YAML files.
+core = 7.x
+
+files[] = includes/Simpleform.php

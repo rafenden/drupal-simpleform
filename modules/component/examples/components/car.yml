@@ -1,0 +1,12 @@
+model:
+  .type: select
+  .title: Model
+  .options:
+    POLONEZ: Polonez
+    OPEL: Opel
+    AUDI: Audi
+yearOfProduction:
+  .type: textfield
+  .title: Year of production
+  .required: true
+  .required_error: Please specify year of production.

@@ -1,0 +1,11 @@
+.btn-back {
+  float: left;
+}
+
+.btn-next, .btn-submit {
+  float: right;
+}
+
+.simpleform-step-current {
+  font-weight: bold;
+}

@@ -1,0 +1,96 @@
+<?php
+
+use Symfony\Component\Yaml\Yaml;
+
+/**
+ * Implements hook_element_info().
+ */
+function simpleform_component_element_info() {
+  $types['component'] = array(
+    '#process' => array('simpleform_component_process_component'),
+  );
+
+  return $types;
+}
+
+/**
+ * Processes a component element.
+ *
+ * @param $element
+ *   An associative array containing the properties of the component.
+ * @param $form_state
+ *   The $form_state array for the form this element belongs to.
+ *
+ * @return
+ *   The processed element.
+ */
+function simpleform_component_process_component($element, &$form_state) {
+  $component = simpleform_component_load($element['#component']);
+
+  Simpleform::drupalizeElements($component);
+
+  // TODO: Handle overrides for nested components.
+  if (isset($element['#overrides'])) {
+    $component = simpleform_component_override($component, $element['#overrides']);
+  }
+
+  $element['group'] = array(
+    '#type' => empty($element['#embedded']) ? 'fieldset' : 'item',
+    '#parents' => $element['#parents'],
+    '#tree' => TRUE,
+  );
+
+  $excluded_attributes = array('#id', '#weight', '#defaults_loaded', '#processed', '#attributes', '#overrides', '#type', '#parents', '#array_parents', '#tree', '#after_build', '#process');
+  foreach ($element as $property_key => $property) {
+    if ($property_key[0] == '#' && !in_array($property_key, $excluded_attributes)) {
+      $element['group'][$property_key] = $property;
+    }
+  }
+
+  $element['group'] += $component;
+
+  return $element;
+}
+
+/**
+ * Load the component with given name.
+ *
+ * @param $component_name
+ *
+ * @return mixed|null
+ */
+function simpleform_component_load($component_name) {
+  if (!($components_path = variable_get('simpleform_components_path'))) {
+    $module_path = drupal_get_path('module', 'simpleform_component');
+    $components_path = "$module_path/examples/components";
+  }
+  $filepath  = "$components_path/$component_name.yml";
+  if (file_exists($filepath)) {
+    $yaml = file_get_contents($filepath);
+    $component = Yaml::parse($yaml);
+
+    return $component;
+  }
+  return NULL;
+}
+
+/**
+ * Override fields within a component.
+ *
+ * @param array $component
+ * @param array $overrides
+ *
+ * @return array
+ */
+function simpleform_component_override(array &$component, array &$overrides ) {
+  $merged = $component;
+  foreach ($overrides as $key => &$value) {
+    if (is_array($value) && isset($merged[$key]) && is_array($merged[$key])) {
+      $merged[$key] = simpleform_component_override($merged[$key], $value);
+    }
+    else {
+      $merged [$key] = $value;
+    }
+  }
+  return $merged;
+}

@@ -1,0 +1,4 @@
+# The whole concept is to use below tokens in any place inside YAML file.
+# Example: Average time to submit this form is %default_eta.
+form_confirmation_message: Thank you for submitting the form
+default_eta: few minutes

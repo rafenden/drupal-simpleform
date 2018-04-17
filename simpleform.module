@@ -1,0 +1,395 @@
+<?php
+
+use Symfony\Component\Yaml\Yaml;
+
+require_once __DIR__ . '/vendor/autoload.php';
+
+/**
+ * Implements hook_menu().
+ */
+function simpleform_menu() {
+  $items['form/%simpleform'] = array(
+    'title callback' => 'simpleform_page_title',
+    'title arguments' => array(1),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('simpleform_form', 1),
+    'access arguments' => array('access content'),
+  );
+
+  $items['form/%simpleform/confirmation'] = array(
+    'title callback' => 'simpleform_confirmation_page_title',
+    'title arguments' => array(1),
+    'page callback' => 'simpleform_confirmation_page_view',
+    'page arguments' => array(1),
+    'access arguments' => array('access content'),
+  );
+
+  return $items;
+}
+
+/**
+ * @param $simpleform_name
+ *
+ * @return \Simpleform
+ */
+function simpleform_load($simpleform_name) {
+  return Simpleform::load($simpleform_name, variable_get('simpleform_no_cache', TRUE));
+}
+
+/**
+ * Title callback: Returns the title of the case.
+ *
+ * @param \Simpleform|null $simpleform
+ *
+ * @return null|string
+ *
+ */
+function simpleform_page_title($simpleform) {
+  if ($simpleform) {
+    return $simpleform->getLabel();
+  }
+  return NULL;
+}
+
+/**
+ * Form wrapper for Simpleform.
+ *
+ * @param $form
+ * @param $form_state
+ * @param \Simpleform $simpleform
+ *
+ * @return array|mixed
+ */
+function simpleform_form($form, &$form_state, Simpleform $simpleform) {
+  $form['#simpleform'] = $simpleform;
+  $form['#theme'] = 'simpleform';
+
+  // Information useful when executing AJAX callbacks.
+  if (isset($form_state['triggering_element'])) {
+    $triggering_element = $form_state['triggering_element'];
+    $triggering_element_key = end($triggering_element['#parents']);
+  }
+  else {
+    $triggering_element = array();
+    $triggering_element_key = NULL;
+  }
+
+  if ($triggering_element_key == 'next') {
+    $simpleform->goToNextStep();
+  }
+  elseif ($triggering_element_key == 'back') {
+    $simpleform->goToPrevStep();
+  }
+
+  // Evaluate conditions for steps.
+  if (module_exists('conditional') && isset($form_state['storage']['all']['values'])) {
+    $prev_form = $form_state['complete form'];
+    foreach (element_children($prev_form) as $element_child_key) {
+      $element = $prev_form[$element_child_key];
+      if ($element['#type'] == 'step' && !empty($element['#visible_when'])) {
+        $dependee_element_name = key($element['#visible_when']);
+        $dependee_expected_value = current($element['#visible_when']);
+        $conditional = new Conditional($element, 'visible', $dependee_element_name, $dependee_expected_value);
+        $dependee_parents = conditional_element_name_to_parents($dependee_element_name);
+        $dependee_values = drupal_array_get_nested_value($form_state['storage']['all']['input'], $dependee_parents);
+        if (!$conditional->evaluate($dependee_values)) {
+          $simpleform->hideStep($element_child_key);
+        }
+        else {
+          $simpleform->showStep($element_child_key);
+        }
+      }
+    }
+  }
+
+  $form += $simpleform->getElementsOnStep();
+
+  $form['actions'] = array(
+    '#type' => 'actions',
+    '#attributes' => array('style' => 'margin-top: 30px'),
+  );
+
+  $form['actions'] += $simpleform->getActions();
+
+  $form['#simpleform_root'] = TRUE;
+
+  $form['#prefix'] = '<div id="simpleform-wrapper">';
+  $form['#suffix'] = '</div>';
+
+  $module_path = drupal_get_path('module', 'simpleform');
+  $form['#attached']['js'][] = "$module_path/simpleform.js";
+  $form['#attached']['css'][] = "$module_path/theme/simpleform.css";
+
+  return $form;
+}
+
+/**
+ * Themes the Simpleform form.
+ *
+ * Inputs: $form
+ */
+function template_preprocess_simpleform(&$variables) {
+  $variables['simpleform'] = $variables['form']['#simpleform'];
+}
+
+/**
+ * Submit callback for embedded navigation buttons (back/next).
+ */
+function simpleform_ajax_button_submit(&$form, &$form_state) {
+  /** @var Simpleform $simpleform */
+  $simpleform = $form['#simpleform'];
+  $current_step_name = $simpleform->getCurrentStepName();
+
+  // Initialise storage values.
+  if (!empty($form_state['storage']['all']['values'])) {
+    $form_state['storage']['all']['values'] = array();
+  }
+  if (!empty($form_state['storage']['all']['input'])) {
+    $form_state['storage']['all']['input'] = array();
+  }
+
+  // Save away the current information.
+  if (!empty($form_state['values'])) {
+    $form_state['storage']['values'][$current_step_name] = $form_state['values'];
+    $form_state['storage']['input'][$current_step_name] = $form_state['input'];
+
+    $form_state['storage']['all']['values'] = array();
+    $form_state['storage']['all']['input'] = array();
+    foreach ($form_state['storage']['values'] as $step_number => $step_values) {
+      $form_state['storage']['all']['values'] = array_merge($form_state['storage']['all']['values'], $form_state['storage']['values'][$step_number]);
+      $form_state['storage']['all']['input'] = array_merge($form_state['storage']['all']['input'], $form_state['storage']['input'][$step_number]);
+    }
+  }
+
+  $form_state['rebuild'] = TRUE;
+
+  $form_state['values'] = $form_state['storage']['all']['values'];
+  $form_state['input'] = $form_state['storage']['all']['input'];
+}
+
+/**
+ * Ajax callback used to navigate between steps.
+ */
+function simpleform_ajax_callback_item($form, &$form_state) {
+  $element = array();
+  $array_parents = $form_state['triggering_element']['#array_parents'];
+
+  while (!isset($element['#simpleform_root'])) {
+    $element = drupal_array_get_nested_value($form, $array_parents);
+    array_pop($array_parents);
+  }
+
+  return $element;
+}
+
+/**
+ * Submit callback for embedded navigation buttons (back/next).
+ */
+function simpleform_form_submit(&$form, &$form_state) {
+  /** @var \Simpleform $simpleform */
+  $simpleform = $form['#simpleform'];
+  $form_state['redirect'] = $simpleform->getConfirmationURL();
+}
+
+/**
+ * Implements hook_element_info().
+ */
+function simpleform_element_info() {
+  $types['step'] = array(
+    '#theme_wrappers' => array('step'),
+    '#default_tab' => '',
+    '#process' => array('simpleform_element_process_step'),
+  );
+  return $types;
+}
+
+/**
+ * Implements hook_element_info_alter().
+ */
+function simpleform_element_info_alter(&$types) {
+  foreach ($types as $type => $info) {
+    $types[$type]['#after_build'][] = 'simpleform_element_after_build';
+
+    // Simpleform process needs to be executed before process functions from
+    // radios, select and checkboxes where the actual child elements are created.
+    if (!isset($types[$type]['#process'])) {
+      $types[$type]['#process'] = array();
+    }
+    array_unshift($types[$type]['#process'], 'simpleform_element_process_options_preset');
+  }
+}
+
+/**
+ * Processes elements after they are built.
+ */
+function simpleform_element_after_build($element, &$form_state) {
+  // Add #visible attribute.
+  if (isset($element['#visible'])) {
+    $element['#access'] = $element['#visible'];
+    unset($element['#visible']);
+    if (!$element['#access']) {
+      $element['#required'] = FALSE;
+    }
+  }
+  return $element;
+}
+
+/**
+ * Process for reusable options.
+ */
+function simpleform_element_process_options_preset($element, &$form_state) {
+  // Handle reusable #options.
+  if (!empty($element['#options']) && is_string($element['#options'])) {
+    $id = $element['#options'];
+
+    $element['#options'] = simpleform_options_load($id);
+  }
+  return $element;
+}
+
+/**
+ * Load options with given name.
+ *
+ * @param $options_name
+ *   Name of options YAML file.
+ *
+ * @return array
+ *   Array of options.
+ */
+function simpleform_options_load($options_name) {
+  if (empty($options_path = variable_get('simpleform_options_path'))) {
+    $module_path = drupal_get_path('module', 'simpleform');
+    $options_path = "$module_path/examples/options";
+  }
+  $filepath  = "$options_path/$options_name.yml";
+  try {
+    if (file_exists($filepath)) {
+      $yaml = file_get_contents($filepath);
+      $options = Yaml::parse($yaml);
+
+      return $options;
+    }
+    else {
+      throw new \Exception("Could not find file for options under $filepath.");
+    }
+  }
+  catch (Exception $e) {
+    watchdog_exception('simpleform', $e);
+  }
+  return array();
+}
+
+/**
+ * Creates a single form step.
+ *
+ * @param <array> $element
+ *   An associative array containing the properties and children of the step.
+ * @param <array> $form_state
+ *   The $form_state array for the form this widget belongs to.
+ *
+ * @return <array>
+ *   The processed element.
+ */
+function simpleform_element_process_step($element, &$form_state) {
+  // Inject a new element as child.
+  $element['step'] = array(
+    '#type' => 'markup',
+    '#theme_wrappers' => array(),
+    '#parents' => $element['#parents'],
+  );
+
+  return $element;
+}
+
+/**
+ * Implements hook_theme().
+ */
+function simpleform_theme() {
+  return array(
+    'step' => array(
+      'render element' => 'element',
+    ),
+    'simpleform' => array(
+      'render element' => 'form',
+      'template' => 'theme/simpleform',
+    ),
+    'simpleform_confirmation' => array(
+      'template' => 'theme/simpleform-confirmation',
+      'variables' => array(
+        'message' => NULL,
+      ),
+    ),
+  );
+}
+
+/**
+ * Returns HTML for a single form step.
+ *
+ * @param <array> $variables
+ *   An associative array containing:
+ *   - element: An associative array containing the properties and children of
+ *     the form included in the step. Properties used: #children.
+ *
+ * @ingroup themeable
+ */
+function theme_step($variables) {
+  $element = $variables['element'];
+  $output = $element['#children'];
+  return $output;
+}
+
+/**
+ * Title callback: Returns the title of the case.
+ *
+ * @param \Simpleform|null $simpleform
+ *
+ * @return null|string
+ *
+ */
+function simpleform_confirmation_page_title($simpleform) {
+  if ($simpleform) {
+    return $simpleform->getConfirmationPageTitle();
+  }
+  return NULL;
+}
+
+/**
+ * Menu callback: Confirmation page.
+ *
+ * @param $simpleform
+ *
+ * @return array|int
+ */
+function simpleform_confirmation_page_view($simpleform) {
+  /** @var Simpleform $simpleform */
+  if (!$simpleform) {
+    return MENU_NOT_FOUND;
+  }
+
+  $message = $simpleform->getSetting('confirmation_message')
+    ?: t('Thank you for submitting the request.');
+
+  return array(
+    '#theme' => 'simpleform_confirmation',
+    '#message' => $message,
+  );
+}
+
+/**
+ * @todo Implement this functionality.
+ *
+ * @return array
+ */
+function simpleform_element_default_options() {
+  $options = array(
+    'textfield' => array('#size' => 20),
+    'date_popup' => array(
+      '#date_format' => 'd/m/Y',
+      '#datepicker_options' => array('maxDate' => 30),
+      '#date_year_range' => '0:+4',
+      '#date_label_position' => 'none',
+    ),
+  );
+  drupal_alter('simpleform_element_default_options', $options);
+  return $options;
+}

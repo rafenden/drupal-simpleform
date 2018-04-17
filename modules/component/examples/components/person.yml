@@ -1,0 +1,26 @@
+title:
+  .type: select
+  .title: Title
+  .options:
+    MR: Mr
+    MRS: Mrs
+    MISS: Miss
+    MS: Ms
+    MASTER: Master
+    DR: Dr
+    REV: Rev
+    OTHER: Other
+firstName:
+  .type: textfield
+  .title: Fitst name
+  .required: true
+lastName:
+  .type: textfield
+  .title: Last name
+address:
+  .type: address
+  .title: Address
+car:
+  .type: component
+  .component: car
+  .title: Car

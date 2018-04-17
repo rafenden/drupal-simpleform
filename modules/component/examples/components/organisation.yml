@@ -1,0 +1,10 @@
+name:
+  .title: Name of the organisation
+  .type: textfield
+charityNumber:
+  .title: Charity number (if applicable)
+  .type: textfield
+address:
+  .title: What is the organisation address?
+  .type: textfield
+  .required: true

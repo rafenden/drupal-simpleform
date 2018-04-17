@@ -1,0 +1,18 @@
+<?php
+
+/**
+ * Implements hook_requirements().
+ */
+function simpleform_requirements($phase) {
+  $requirements = [];
+  if ($phase == 'install') {
+    if (!class_exists('\Symfony\Component\Yaml\Yaml')) {
+      $requirements['yaml_library'] = [
+        'description' => t('Simpleform requires the symfony/yaml library.'),
+        'severity' => REQUIREMENT_ERROR,
+      ];
+    }
+  }
+
+  return $requirements;
+}

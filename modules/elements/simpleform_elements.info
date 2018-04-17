@@ -1,0 +1,5 @@
+name = Simpleform Elements
+description = Provides additional components useful when adding Simpleforms.
+core = 7.x
+
+dependencies[] = simpleform

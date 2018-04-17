@@ -1,0 +1,5 @@
+name = Simpleform Editor
+description = Editor used to build Simpleforms.
+core = 7.x
+
+dependencies[] = simpleform
